@@ -26,8 +26,10 @@ type Packet struct {
 
 var (
 	serviceAddress  = flag.String("address", ":8125", "UDP service address")
-	graphiteAddress = flag.String("graphie", "localhost:2003",
-				"Graphite service address")
+	graphiteAddress = flag.String("graphite", "localhost:2003",
+		"Graphite service address")
+	gangliaAddress = flag.String("ganglia", "localhost:8469",
+		"Ganglia gmond service address")
 	flushInterval    = flag.Int64("flush-interval", 10, "Flush interval")
 	percentThreshold = flag.Int("percent-threshold", 90, "Threshold percent")
 )
@@ -68,53 +70,53 @@ func monitor() {
 }
 
 func submit() {
-	client, err := net.Dial(TCP, *graphiteAddress)
-	if client != nil {
-		numStats := 0
-		now := time.Now()
-		buffer := bytes.NewBufferString("")
-		for s, c := range counters {
-			value := int64(c) / ((*flushInterval * int64(time.Second)) / 1e3)
-			fmt.Fprintf(buffer, "stats.%s %d %d\n", s, value, now)
-			fmt.Fprintf(buffer, "stats_counts.%s %d %d\n", s, c, now)
-			counters[s] = 0
-			numStats++
-		}
-		for u, t := range timers {
-			if len(t) > 0 {
-				sort.Ints(t)
-				min := t[0]
-				max := t[len(t)-1]
-				mean := min
-				maxAtThreshold := max
-				count := len(t)
-				if len(t) > 1 {
-					var thresholdIndex int
-					thresholdIndex = ((100 - *percentThreshold) / 100) * count
-					numInThreshold := count - thresholdIndex
-					values := t[0:numInThreshold]
+	clientGraphite, err := net.Dial(TCP, *graphiteAddress)
+	numStats := 0
+	now := time.Now()
+	buffer := bytes.NewBufferString("")
+	for s, c := range counters {
+		value := int64(c) / ((*flushInterval * int64(time.Second)) / 1e3)
+		fmt.Fprintf(buffer, "stats.%s %d %d\n", s, value, now)
+		fmt.Fprintf(buffer, "stats_counts.%s %d %d\n", s, c, now)
+		counters[s] = 0
+		numStats++
+	}
+	for u, t := range timers {
+		if len(t) > 0 {
+			sort.Ints(t)
+			min := t[0]
+			max := t[len(t)-1]
+			mean := min
+			maxAtThreshold := max
+			count := len(t)
+			if len(t) > 1 {
+				var thresholdIndex int
+				thresholdIndex = ((100 - *percentThreshold) / 100) * count
+				numInThreshold := count - thresholdIndex
+				values := t[0:numInThreshold]
 
-					sum := 0
-					for i := 0; i < numInThreshold; i++ {
-						sum += values[i]
-					}
-					mean = sum / numInThreshold
+				sum := 0
+				for i := 0; i < numInThreshold; i++ {
+					sum += values[i]
 				}
-				var z []int
-				timers[u] = z
-
-				fmt.Fprintf(buffer, "stats.timers.%s.mean %d %d\n", u, mean, now)
-				fmt.Fprintf(buffer, "stats.timers.%s.upper %d %d\n", u, max, now)
-				fmt.Fprintf(buffer, "stats.timers.%s.upper_%d %d %d\n", u,
-					*percentThreshold, maxAtThreshold, now)
-				fmt.Fprintf(buffer, "stats.timers.%s.lower %d %d\n", u, min, now)
-				fmt.Fprintf(buffer, "stats.timers.%s.count %d %d\n", u, count, now)
+				mean = sum / numInThreshold
 			}
-			numStats++
+			var z []int
+			timers[u] = z
+
+			fmt.Fprintf(buffer, "stats.timers.%s.mean %d %d\n", u, mean, now)
+			fmt.Fprintf(buffer, "stats.timers.%s.upper %d %d\n", u, max, now)
+			fmt.Fprintf(buffer, "stats.timers.%s.upper_%d %d %d\n", u,
+				*percentThreshold, maxAtThreshold, now)
+			fmt.Fprintf(buffer, "stats.timers.%s.lower %d %d\n", u, min, now)
+			fmt.Fprintf(buffer, "stats.timers.%s.count %d %d\n", u, count, now)
 		}
-		fmt.Fprintf(buffer, "statsd.numStats %d %d\n", numStats, now)
-		client.Write(buffer.Bytes())
-		client.Close()
+		numStats++
+	}
+	fmt.Fprintf(buffer, "statsd.numStats %d %d\n", numStats, now)
+	if clientGraphite != nil {
+		clientGraphite.Write(buffer.Bytes())
+		clientGraphite.Close()
 	} else {
 		log.Printf(err.Error())
 	}
