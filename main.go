@@ -70,7 +70,26 @@ func monitor() {
 }
 
 func submit() {
-	clientGraphite, err := net.Dial(TCP, *graphiteAddress)
+	var clientGraphite net.Conn
+	if clientGraphite != nil {
+		log.Println(clientGraphite)
+	}
+	var err error
+	if err != nil {
+		log.Println(err)
+	}
+	if *graphiteAddress != "" {
+		clientGraphite, err := net.Dial(TCP, *graphiteAddress)
+		if clientGraphite != nil {
+			// This is a really painful hack to get around the inability of
+			// the Go compiler to notice that I'm using clientGraphite.
+			if clientGraphite.LocalAddr() == nil {
+			}
+		}
+		if err != nil {
+			log.Printf(err.Error())
+		}
+	}
 	numStats := 0
 	now := time.Now()
 	buffer := bytes.NewBufferString("")
@@ -117,8 +136,6 @@ func submit() {
 	if clientGraphite != nil {
 		clientGraphite.Write(buffer.Bytes())
 		clientGraphite.Close()
-	} else {
-		log.Printf(err.Error())
 	}
 }
 
