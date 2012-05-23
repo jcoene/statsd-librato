@@ -85,6 +85,9 @@ func submit() {
 			// the Go compiler to notice that I'm using clientGraphite.
 			if clientGraphite.LocalAddr() == nil {
 			}
+
+      // Run this when we're all done, only if clientGraphite was opened.
+      defer clientGraphite.Close()
 		}
 		if err != nil {
 			log.Printf(err.Error())
@@ -135,7 +138,6 @@ func submit() {
 	fmt.Fprintf(buffer, "statsd.numStats %d %d\n", numStats, now)
 	if clientGraphite != nil {
 		clientGraphite.Write(buffer.Bytes())
-		clientGraphite.Close()
 	}
 }
 
@@ -170,6 +172,7 @@ func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 func udpListener() {
 	address, _ := net.ResolveUDPAddr(UDP, *serviceAddress)
 	listener, err := net.ListenUDP(UDP, address)
+	defer listener.Close()
 	if err != nil {
 		log.Fatalf("ListenAndServe: %s", err.Error())
 	}
@@ -182,7 +185,6 @@ func udpListener() {
 		buf := bytes.NewBuffer(message[0:n])
 		go handleMessage(listener, remaddr, buf)
 	}
-	listener.Close()
 }
 
 func main() {
@@ -190,3 +192,4 @@ func main() {
 	go udpListener()
 	monitor()
 }
+
