@@ -26,14 +26,11 @@ type Packet struct {
 }
 
 var (
-	serviceAddress  = flag.String("address", ":8125", "UDP service address")
-	graphiteAddress = flag.String("graphite", "localhost:2003",
-		"Graphite service address")
-	gangliaAddress = flag.String("ganglia", "localhost",
-		"Ganglia gmond service address")
+	serviceAddress   = flag.String("address", ":8125", "UDP service address")
+	graphiteAddress  = flag.String("graphite", "localhost:2003", "Graphite service address")
+	gangliaAddress   = flag.String("ganglia", "localhost", "Ganglia gmond service address")
 	gangliaPort      = flag.Int("ganglia-port", 8649, "Ganglia gmond service port")
-	gangliaSpoofHost = flag.String("ganglia-spoof-host", "localhost:8469",
-		"Ganglia gmond spoof host string")
+	gangliaSpoofHost = flag.String("ganglia-spoof-host", "", "Ganglia gmond spoof host string")
 	flushInterval    = flag.Int64("flush-interval", 10, "Flush interval")
 	percentThreshold = flag.Int("percent-threshold", 90, "Threshold percent")
 )
