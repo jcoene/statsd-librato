@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"github.com/jbuchbinder/go-gmetric/gmetric"
 	"log"
 	"net"
 	"regexp"
 	"sort"
 	"strconv"
 	"time"
-	"github.com/jbuchbinder/go-gmetric/gmetric"
 )
 
 const (
@@ -31,7 +31,7 @@ var (
 		"Graphite service address")
 	gangliaAddress = flag.String("ganglia", "localhost",
 		"Ganglia gmond service address")
-	gangliaPort = flag.Int("ganglia-port", 8649, "Ganglia gmond service port")
+	gangliaPort      = flag.Int("ganglia-port", 8649, "Ganglia gmond service port")
 	gangliaSpoofHost = flag.String("ganglia-spoof-host", "localhost:8469",
 		"Ganglia gmond spoof host string")
 	flushInterval    = flag.Int64("flush-interval", 10, "Flush interval")
@@ -42,6 +42,7 @@ var (
 	In       = make(chan Packet, 10000)
 	counters = make(map[string]int)
 	timers   = make(map[string][]int)
+	gauges   = make(map[string]int)
 )
 
 func monitor() {
@@ -62,6 +63,12 @@ func monitor() {
 					timers[s.Bucket] = t
 				}
 				timers[s.Bucket] = append(timers[s.Bucket], s.Value)
+			} else if s.Modifier == "g" {
+				_, ok := gauges[s.Bucket]
+				if !ok {
+					gauges[s.Bucket] = 0
+				}
+				gauges[s.Bucket] += s.Value
 			} else {
 				_, ok := counters[s.Bucket]
 				if !ok {
@@ -101,23 +108,24 @@ func submit() {
 	var gm gmetric.Gmetric
 	gmSubmit := func(name string, value uint32) {
 		if useGanglia {
-			m_value := fmt.Sprint( value )
+			m_value := fmt.Sprint(value)
 			m_units := "count"
-			m_type  := uint32( gmetric.VALUE_UNSIGNED_INT )
-			m_slope := uint32( gmetric.SLOPE_BOTH )
-			m_grp   := "statsd"
-			m_ival  := uint32( *flushInterval * int64(2) )
+			m_type := uint32(gmetric.VALUE_UNSIGNED_INT)
+			m_slope := uint32(gmetric.SLOPE_BOTH)
+			m_grp := "statsd"
+			m_ival := uint32(*flushInterval * int64(2))
 
 			go gm.SendMetric(name, m_value, m_type, m_units, m_slope, m_ival, m_ival, m_grp)
 		}
 	}
 	if *gangliaAddress != "" {
-		gIP, err := net.ResolveIPAddr( "ip4", *gangliaAddress )
+		gIP, err := net.ResolveIPAddr("ip4", *gangliaAddress)
 		if err != nil {
 			panic("Could not look up ganglia address")
 		}
 		gm := gmetric.Gmetric{gIP.IP, *gangliaPort, *gangliaSpoofHost, *gangliaSpoofHost}
-		if gm.GangliaPort == 0 {}
+		if gm.GangliaPort == 0 {
+		}
 		useGanglia = true
 	} else {
 		useGanglia = false
@@ -132,6 +140,12 @@ func submit() {
 		fmt.Fprintf(buffer, "stats_counts.%s %d %d\n", s, c, now)
 		gmSubmit(fmt.Sprintf("stats_counts_%s", s), uint32(c))
 		counters[s] = 0
+		numStats++
+	}
+	for i, g := range gauges {
+		value := int64(g)
+		fmt.Fprintf(buffer, "stats.%s %d %d\n", i, value, now)
+		gmSubmit(fmt.Sprintf("stats_%s", i), uint32(value))
 		numStats++
 	}
 	for u, t := range timers {
@@ -229,4 +243,3 @@ func main() {
 	go udpListener()
 	monitor()
 }
-
