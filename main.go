@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -116,12 +117,27 @@ func submit() {
 		}
 	}
 	if *gangliaAddress != "" {
-		gIP, err := net.ResolveIPAddr("ip4", *gangliaAddress)
-		if err != nil {
-			panic("Could not look up ganglia address")
+		gm = gmetric.Gmetric{
+			Host:  *gangliaSpoofHost,
+			Spoof: *gangliaSpoofHost,
 		}
-		gm := gmetric.Gmetric{gIP.IP, *gangliaPort, *gangliaSpoofHost, *gangliaSpoofHost}
-		if gm.GangliaPort == 0 {
+		gm.SetVerbose(false)
+
+		if strings.Contains(*gangliaAddress, ",") {
+			segs := strings.Split(*gangliaAddress, ",")
+			for i := 0; i < len(segs); i++ {
+				gIP, err := net.ResolveIPAddr("ip4", segs[i])
+				if err != nil {
+					panic(err.Error())
+				}
+				gm.AddServer(gmetric.GmetricServer{gIP.IP, *gangliaPort})
+			}
+		} else {
+			gIP, err := net.ResolveIPAddr("ip4", *gangliaAddress)
+			if err != nil {
+				panic(err.Error())
+			}
+			gm.AddServer(gmetric.GmetricServer{gIP.IP, *gangliaPort})
 		}
 		useGanglia = true
 	} else {
