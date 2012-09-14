@@ -90,11 +90,6 @@ func submit() {
 	if *graphiteAddress != "" {
 		clientGraphite, err := net.Dial(TCP, *graphiteAddress)
 		if clientGraphite != nil {
-			// This is a really painful hack to get around the inability of
-			// the Go compiler to notice that I'm using clientGraphite.
-			if clientGraphite.LocalAddr() == nil {
-			}
-
 			// Run this when we're all done, only if clientGraphite was opened.
 			defer clientGraphite.Close()
 		}
