@@ -210,7 +210,7 @@ func submit() {
 func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 	var packet Packet
 	var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
-	var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_]+):([0-9]+)\\|(c|ms)(\\|@([0-9\\.]+))?")
+	var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_]+):([0-9\\.]+)\\|(c|ms)(\\|@([0-9\\.]+))?")
 	s := sanitizeRegexp.ReplaceAllString(buf.String(), "")
 	for _, item := range packetRegexp.FindAllStringSubmatch(s, -1) {
 		value, err := strconv.Atoi(item[2])
