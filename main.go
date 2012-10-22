@@ -231,6 +231,11 @@ func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 		packet.Value = value
 		packet.Modifier = item[3]
 		packet.Sampling = float32(sampleRate)
+
+		if *debug {
+			fmt.Printf("Packet: bucket = %s, value = %s, modifier = %s, sampling = %d\n", packet.Bucket, packet.Value, packet.Modifier, packet.Sampling)
+		}
+
 		In <- packet
 	}
 }
