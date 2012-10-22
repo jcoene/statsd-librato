@@ -28,12 +28,13 @@ type Packet struct {
 
 var (
 	serviceAddress   = flag.String("address", ":8125", "UDP service address")
-	graphiteAddress  = flag.String("graphite", "localhost:2003", "Graphite service address")
+	graphiteAddress  = flag.String("graphite", "", "Graphite service address (example: 'localhost:2003')")
 	gangliaAddress   = flag.String("ganglia", "localhost", "Ganglia gmond servers, comma separated")
 	gangliaPort      = flag.Int("ganglia-port", 8649, "Ganglia gmond service port")
 	gangliaSpoofHost = flag.String("ganglia-spoof-host", "", "Ganglia gmond spoof host string")
 	flushInterval    = flag.Int64("flush-interval", 10, "Flush interval")
 	percentThreshold = flag.Int("percent-threshold", 90, "Threshold percent")
+	debug            = flag.Bool("debug", false, "Debug mode")
 )
 
 var (
@@ -101,6 +102,9 @@ func submit() {
 	var gm gmetric.Gmetric
 	gmSubmit := func(name string, value uint32) {
 		if useGanglia {
+			if *debug {
+				fmt.Printf("Ganglia send metric %s value %d\n", name, value)
+			}
 			m_value := fmt.Sprint(value)
 			m_units := "count"
 			m_type := uint32(gmetric.VALUE_UNSIGNED_INT)
@@ -196,6 +200,9 @@ func submit() {
 	fmt.Fprintf(buffer, "statsd.numStats %d %d\n", numStats, now)
 	gmSubmit("statsd_numStats", uint32(numStats))
 	if clientGraphite != nil {
+		if *debug {
+			fmt.Printf("Send to graphite: [[[%s]]]\n", string(buffer.Bytes()))
+		}
 		clientGraphite.Write(buffer.Bytes())
 	}
 }
@@ -242,6 +249,9 @@ func udpListener() {
 			continue
 		}
 		buf := bytes.NewBuffer(message[0:n])
+		if *debug {
+			fmt.Printf("Packet received: " + string(message[0:n]) + "\n")
+		}
 		go handleMessage(listener, remaddr, buf)
 	}
 }
