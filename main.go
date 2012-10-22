@@ -21,7 +21,7 @@ const (
 
 type Packet struct {
 	Bucket   string
-	Value    int
+	Value    string
 	Modifier string
 	Sampling float32
 }
@@ -61,19 +61,22 @@ func monitor() {
 					var t []int
 					timers[s.Bucket] = t
 				}
-				timers[s.Bucket] = append(timers[s.Bucket], s.Value)
+				intValue, _ := strconv.Atoi(s.Value)
+				timers[s.Bucket] = append(timers[s.Bucket], intValue)
 			} else if s.Modifier == "g" {
 				_, ok := gauges[s.Bucket]
 				if !ok {
 					gauges[s.Bucket] = 0
 				}
-				gauges[s.Bucket] += s.Value
+				intValue, _ := strconv.Atoi(s.Value)
+				gauges[s.Bucket] += intValue
 			} else {
 				_, ok := counters[s.Bucket]
 				if !ok {
 					counters[s.Bucket] = 0
 				}
-				counters[s.Bucket] += int(float32(s.Value) * (1 / s.Sampling))
+				floatValue, _ := strconv.ParseFloat(s.Value, 32)
+				counters[s.Bucket] += int(float32(floatValue) * (1 / s.Sampling))
 			}
 		}
 	}
@@ -209,16 +212,18 @@ func submit() {
 
 func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 	var packet Packet
+	var value string
 	var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
 	var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_]+):([0-9\\.]+)\\|(c|ms)(\\|@([0-9\\.]+))?")
 	s := sanitizeRegexp.ReplaceAllString(buf.String(), "")
 	for _, item := range packetRegexp.FindAllStringSubmatch(s, -1) {
-		value, err := strconv.Atoi(item[2])
+		value = item[2]
+		_, err := strconv.Atoi(item[2])
 		if err != nil {
 			if item[3] == "ms" {
-				value = 0
+				value = "0"
 			} else {
-				value = 1
+				value = "1"
 			}
 		}
 
@@ -233,7 +238,7 @@ func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 		packet.Sampling = float32(sampleRate)
 
 		if *debug {
-			fmt.Printf("Packet: bucket = %s, value = %s, modifier = %s, sampling = %d\n", packet.Bucket, packet.Value, packet.Modifier, packet.Sampling)
+			fmt.Printf("Packet: bucket = %s, value = %s, modifier = %s, sampling = %f\n", packet.Bucket, packet.Value, packet.Modifier, packet.Sampling)
 		}
 
 		In <- packet
