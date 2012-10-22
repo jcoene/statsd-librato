@@ -1,6 +1,8 @@
 STATSD-GO
 =========
 
+[![Build Status](https://secure.travis-ci.org/jbuchbinder/statsd-go.png)](http://travis-ci.org/jbuchbinder/statsd-go)
+
 Port of Etsy's statsd, written in Go.
 
 This was forked from https://github.com/amir/gographite to provide
