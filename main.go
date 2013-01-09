@@ -85,15 +85,9 @@ func monitor() {
 
 func submit() {
 	var clientGraphite net.Conn
-	if clientGraphite != nil {
-		log.Println(clientGraphite)
-	}
-	var err error
-	if err != nil {
-		log.Println(err)
-	}
 	if *graphiteAddress != "" {
-		clientGraphite, err := net.Dial(TCP, *graphiteAddress)
+		var err error
+		clientGraphite, err = net.Dial(TCP, *graphiteAddress)
 		if clientGraphite != nil {
 			// Run this when we're all done, only if clientGraphite was opened.
 			defer clientGraphite.Close()
@@ -107,7 +101,7 @@ func submit() {
 	gmSubmit := func(name string, value uint32) {
 		if useGanglia {
 			if *debug {
-				fmt.Printf("Ganglia send metric %s value %d\n", name, value)
+				log.Println("Ganglia send metric %s value %d\n", name, value)
 			}
 			m_value := fmt.Sprint(value)
 			m_units := "count"
@@ -122,7 +116,7 @@ func submit() {
 	gmSubmitFloat := func(name string, value float64) {
 		if useGanglia {
 			if *debug {
-				fmt.Printf("Ganglia send float metric %s value %f\n", name, value)
+				log.Println("Ganglia send float metric %s value %f\n", name, value)
 			}
 			m_value := fmt.Sprint(value)
 			m_units := "count"
@@ -233,7 +227,7 @@ func submit() {
 	gmSubmit("statsd_numStats", uint32(numStats))
 	if clientGraphite != nil {
 		if *debug {
-			fmt.Printf("Send to graphite: [[[%s]]]\n", string(buffer.Bytes()))
+			log.Println("Send to graphite: [[[%s]]]\n", string(buffer.Bytes()))
 		}
 		clientGraphite.Write(buffer.Bytes())
 	}
@@ -265,7 +259,7 @@ func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 		packet.Sampling = float32(sampleRate)
 
 		if *debug {
-			fmt.Printf("Packet: bucket = %s, value = %s, modifier = %s, sampling = %f\n", packet.Bucket, packet.Value, packet.Modifier, packet.Sampling)
+			log.Println("Packet: bucket = %s, value = %s, modifier = %s, sampling = %f\n", packet.Bucket, packet.Value, packet.Modifier, packet.Sampling)
 		}
 
 		In <- packet
@@ -287,7 +281,7 @@ func udpListener() {
 		}
 		buf := bytes.NewBuffer(message[0:n])
 		if *debug {
-			fmt.Printf("Packet received: " + string(message[0:n]) + "\n")
+			log.Println("Packet received: " + string(message[0:n]) + "\n")
 		}
 		go handleMessage(listener, remaddr, buf)
 	}
