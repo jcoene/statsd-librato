@@ -146,7 +146,7 @@ func submit() (err error) {
 	}
 
 	if m.Count() == 0 {
-		log.Info("no new measurements", *flushInterval)
+		log.Info("no new measurements in the last %d seconds", *flushInterval)
 		return
 	}
 
