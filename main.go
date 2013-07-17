@@ -115,7 +115,6 @@ func submit() (err error) {
 		c.Name = k
 		c.Value = v
 		m.Counters = append(m.Counters, *c)
-		delete(counters, k)
 	}
 
 	for k, v := range gauges {
@@ -123,7 +122,6 @@ func submit() (err error) {
 		g.Name = k
 		g.Value = v
 		m.Gauges = append(m.Gauges, *g)
-		delete(gauges, k)
 	}
 
 	for k, t := range timers {
@@ -142,7 +140,6 @@ func submit() (err error) {
 		}
 
 		m.Gauges = append(m.Gauges, *g)
-		delete(timers, k)
 	}
 
 	if m.Count() == 0 {
