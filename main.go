@@ -155,6 +155,8 @@ func submit() (err error) {
 		return
 	}
 
+	log.Debug("sending payload:\n%s", payload)
+
 	req, err := http.NewRequest("POST", "https://metrics-api.librato.com/v1/metrics", bytes.NewBuffer(payload))
 	if err != nil {
 		return
@@ -171,8 +173,6 @@ func submit() (err error) {
 		log.Warn("error sending %d measurements: %s", m.Count(), err)
 		return
 	}
-
-	log.Debug("sending payload:\n%s", payload)
 
 	log.Info("%d measurements sent", m.Count())
 
