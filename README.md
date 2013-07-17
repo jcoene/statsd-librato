@@ -1,25 +1,20 @@
-STATSD-GO
-=========
+# StatsD Server for Librato
 
-[![Build Status](https://secure.travis-ci.org/jbuchbinder/statsd-go.png)](http://travis-ci.org/jbuchbinder/statsd-go)
+This is an implementation of Etsy's StatsD written in Go that submits data to Librato Metrics.
 
-Port of Etsy's statsd, written in Go.
+This was forked from [https://github.com/jbuchbinder/statsd-go](jbuchbinder/statsd-go) and altered to provide support for Librato as a submission backend.
 
-This was forked from https://github.com/amir/gographite to provide
-Ganglia submission support.
-
-USAGE
------
+# Usage
 
 ```
-Usage of statsd-go:
-  -address=":8125": UDP service address
-  -debug=false: Debug mode
-  -flush-interval=10: Flush interval
-  -ganglia="localhost": Ganglia gmond servers, comma separated
-  -ganglia-port=8649: Ganglia gmond service port
-  -ganglia-spoof-host="": Ganglia gmond spoof host string
-  -graphite="": Graphite service address (example: 'localhost:2003')
-  -percent-threshold=90: Threshold percent
+Usage of statsd:
+  -address="0.0.0.0:8125": UDP service address
+  -debug=false: Enable Debugging
+  -flush=30: Flush Interval (seconds)
+  -token="": Librato API Token
+  -user="": Librato Username
 ```
 
+## License
+
+MIT License, see LICENSE for details.

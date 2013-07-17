@@ -2,21 +2,18 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
-	"github.com/jbuchbinder/go-gmetric/gmetric"
-	"log"
+	"github.com/jcoene/gologger"
 	"net"
+	"net/http"
+	"os"
 	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
-)
-
-const (
-	TCP = "tcp"
-	UDP = "udp"
 )
 
 type Packet struct {
@@ -26,34 +23,60 @@ type Packet struct {
 	Sampling float32
 }
 
+var log *logger.Logger
+
 var (
-	serviceAddress   = flag.String("address", ":8125", "UDP service address")
-	graphiteAddress  = flag.String("graphite", "", "Graphite service address (example: 'localhost:2003')")
-	gangliaAddress   = flag.String("ganglia", "localhost", "Ganglia gmond servers, comma separated")
-	gangliaPort      = flag.Int("ganglia-port", 8649, "Ganglia gmond service port")
-	gangliaSpoofHost = flag.String("ganglia-spoof-host", "", "Ganglia gmond spoof host string")
-	flushInterval    = flag.Int64("flush-interval", 10, "Flush interval")
-	percentThreshold = flag.Int("percent-threshold", 90, "Threshold percent")
-	debug            = flag.Bool("debug", false, "Debug mode")
+	serviceAddress = flag.String("address", "0.0.0.0:8125", "UDP service address")
+	libratoUser    = flag.String("user", "", "Librato Username")
+	libratoToken   = flag.String("token", "", "Librato API Token")
+	flushInterval  = flag.Int64("flush", 30, "Flush Interval (seconds)")
+	debug          = flag.Bool("debug", false, "Enable Debugging")
 )
 
 var (
 	In       = make(chan Packet, 10000)
-	counters = make(map[string]int)
+	counters = make(map[string]int64)
 	timers   = make(map[string][]float64)
-	gauges   = make(map[string]int)
+	gauges   = make(map[string]float64)
 )
 
+type Measurement struct {
+	Counters []Counter     `json:"counters"`
+	Gauges   []interface{} `json:"gauges"`
+}
+
+func (m *Measurement) Count() int {
+	return (len(m.Counters) + len(m.Gauges))
+}
+
+type Counter struct {
+	Name  string `json:"name"`
+	Value int64  `json:"value"`
+}
+
+type SimpleGauge struct {
+	Name  string  `json:"name"`
+	Value float64 `json:"value"`
+}
+
+type ComplexGauge struct {
+	Name       string  `json:"name"`
+	Count      int     `json:"count"`
+	Sum        float64 `json:"sum"`
+	Min        float64 `json:"min"`
+	Max        float64 `json:"max"`
+	SumSquares float64 `json:"sum_squares"`
+}
+
 func monitor() {
-	var err error
-	if err != nil {
-		log.Println(err)
-	}
 	t := time.NewTicker(time.Duration(*flushInterval) * time.Second)
+
 	for {
 		select {
 		case <-t.C:
-			submit()
+			if err := submit(); err != nil {
+				log.Error("submit: %s", err)
+			}
 		case s := <-In:
 			if s.Modifier == "ms" {
 				_, ok := timers[s.Bucket]
@@ -61,184 +84,120 @@ func monitor() {
 					var t []float64
 					timers[s.Bucket] = t
 				}
-				//intValue, _ := strconv.Atoi(s.Value)
 				floatValue, _ := strconv.ParseFloat(s.Value, 64)
 				timers[s.Bucket] = append(timers[s.Bucket], floatValue)
 			} else if s.Modifier == "g" {
 				_, ok := gauges[s.Bucket]
 				if !ok {
-					gauges[s.Bucket] = 0
+					gauges[s.Bucket] = float64(0)
 				}
-				intValue, _ := strconv.Atoi(s.Value)
-				gauges[s.Bucket] += intValue
+				floatValue, _ := strconv.ParseFloat(s.Value, 64)
+				gauges[s.Bucket] += floatValue
 			} else {
 				_, ok := counters[s.Bucket]
 				if !ok {
 					counters[s.Bucket] = 0
 				}
 				floatValue, _ := strconv.ParseFloat(s.Value, 32)
-				counters[s.Bucket] += int(float32(floatValue) * (1 / s.Sampling))
+				counters[s.Bucket] += int64(float32(floatValue) * (1 / s.Sampling))
 			}
 		}
 	}
 }
 
-func submit() {
-	var clientGraphite net.Conn
-	if *graphiteAddress != "" {
-		var err error
-		clientGraphite, err = net.Dial(TCP, *graphiteAddress)
-		if clientGraphite != nil {
-			// Run this when we're all done, only if clientGraphite was opened.
-			defer clientGraphite.Close()
-		}
-		if err != nil {
-			log.Printf(err.Error())
-		}
-	}
-	var useGanglia bool
-	var gm gmetric.Gmetric
-	gmSubmit := func(name string, value uint32) {
-		if useGanglia {
-			if *debug {
-				log.Println("Ganglia send metric %s value %d\n", name, value)
-			}
-			m_value := fmt.Sprint(value)
-			m_units := "count"
-			m_type := uint32(gmetric.VALUE_UNSIGNED_INT)
-			m_slope := uint32(gmetric.SLOPE_BOTH)
-			m_grp := "statsd"
-			m_ival := uint32(*flushInterval * int64(2))
+func submit() (err error) {
+	m := new(Measurement)
+	m.Counters = make([]Counter, 0)
+	m.Gauges = make([]interface{}, 0)
 
-			go gm.SendMetric(name, m_value, m_type, m_units, m_slope, m_ival, m_ival, m_grp)
-		}
+	for k, v := range counters {
+		c := new(Counter)
+		c.Name = k
+		c.Value = v
+		m.Counters = append(m.Counters, *c)
+		delete(counters, k)
 	}
-	gmSubmitFloat := func(name string, value float64) {
-		if useGanglia {
-			if *debug {
-				log.Println("Ganglia send float metric %s value %f\n", name, value)
-			}
-			m_value := fmt.Sprint(value)
-			m_units := "count"
-			m_type := uint32(gmetric.VALUE_DOUBLE)
-			m_slope := uint32(gmetric.SLOPE_BOTH)
-			m_grp := "statsd"
-			m_ival := uint32(*flushInterval * int64(2))
 
-			go gm.SendMetric(name, m_value, m_type, m_units, m_slope, m_ival, m_ival, m_grp)
-		}
+	for k, v := range gauges {
+		g := new(SimpleGauge)
+		g.Name = k
+		g.Value = v
+		m.Gauges = append(m.Gauges, *g)
+		delete(gauges, k)
 	}
-	if *gangliaAddress != "" {
-		gm = gmetric.Gmetric{
-			Host:  *gangliaSpoofHost,
-			Spoof: *gangliaSpoofHost,
-		}
-		gm.SetVerbose(false)
 
-		if strings.Contains(*gangliaAddress, ",") {
-			segs := strings.Split(*gangliaAddress, ",")
-			for i := 0; i < len(segs); i++ {
-				gIP, err := net.ResolveIPAddr("ip4", segs[i])
-				if err != nil {
-					panic(err.Error())
-				}
-				gm.AddServer(gmetric.GmetricServer{gIP.IP, *gangliaPort})
-			}
-		} else {
-			gIP, err := net.ResolveIPAddr("ip4", *gangliaAddress)
-			if err != nil {
-				panic(err.Error())
-			}
-			gm.AddServer(gmetric.GmetricServer{gIP.IP, *gangliaPort})
-		}
-		useGanglia = true
-	} else {
-		useGanglia = false
-	}
-	numStats := 0
-	now := time.Now()
-	buffer := bytes.NewBufferString("")
-	for s, c := range counters {
-		value := float64(c) / float64((float64(*flushInterval)*float64(time.Second))/float64(1e3))
-		fmt.Fprintf(buffer, "stats.%s %d %d\n", s, value, now)
-		gmSubmitFloat(fmt.Sprintf("stats_%s", s), value)
-		fmt.Fprintf(buffer, "stats_counts.%s %d %d\n", s, c, now)
-		gmSubmit(fmt.Sprintf("stats_counts_%s", s), uint32(c))
-		counters[s] = 0
-		numStats++
-	}
-	for i, g := range gauges {
-		value := int64(g)
-		fmt.Fprintf(buffer, "stats.%s %d %d\n", i, value, now)
-		gmSubmit(fmt.Sprintf("stats_%s", i), uint32(value))
-		numStats++
-	}
-	for u, t := range timers {
-		if len(t) > 0 {
+	for k, t := range timers {
+		g := new(ComplexGauge)
+		g.Name = k
+		g.Count = len(t)
+
+		if g.Count > 0 {
 			sort.Float64s(t)
-			min := float64(t[0])
-			max := float64(t[len(t)-1])
-			mean := float64(min)
-			maxAtThreshold := float64(max)
-			count := len(t)
-			if len(t) > 1 {
-				var thresholdIndex int
-				thresholdIndex = ((100 - *percentThreshold) / 100) * count
-				numInThreshold := count - thresholdIndex
-				values := t[0:numInThreshold]
-
-				sum := float64(0)
-				for i := 0; i < numInThreshold; i++ {
-					sum += values[i]
-				}
-				mean = float64(sum) / float64(numInThreshold)
+			g.Min = t[0]
+			g.Max = t[len(t)-1]
+			for _, v := range t {
+				g.Sum += v
+				g.SumSquares += (v * v)
 			}
-			var z []float64
-			timers[u] = z
+		}
 
-			fmt.Fprintf(buffer, "stats.timers.%s.mean %f %d\n", u, mean, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_mean", u), mean)
-			fmt.Fprintf(buffer, "stats.timers.%s.upper %f %d\n", u, max, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_upper", u), max)
-			fmt.Fprintf(buffer, "stats.timers.%s.upper_%d %f %d\n", u,
-				*percentThreshold, maxAtThreshold, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_upper_%d", u, *percentThreshold), maxAtThreshold)
-			fmt.Fprintf(buffer, "stats.timers.%s.lower %f %d\n", u, min, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_lower", u), min)
-			fmt.Fprintf(buffer, "stats.timers.%s.count %d %d\n", u, count, now)
-			gmSubmit(fmt.Sprintf("stats_timers_%s_count", u), uint32(count))
-		} else {
-			// Need to still submit timers as zero
-			fmt.Fprintf(buffer, "stats.timers.%s.mean %f %d\n", u, 0, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_mean", u), 0)
-			fmt.Fprintf(buffer, "stats.timers.%s.upper %f %d\n", u, 0, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_upper", u), 0)
-			fmt.Fprintf(buffer, "stats.timers.%s.upper_%d %f %d\n", u,
-				*percentThreshold, 0, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_upper_%d", u, *percentThreshold), 0)
-			fmt.Fprintf(buffer, "stats.timers.%s.lower %f %d\n", u, 0, now)
-			gmSubmitFloat(fmt.Sprintf("stats_timers_%s_lower", u), 0)
-			fmt.Fprintf(buffer, "stats.timers.%s.count %d %d\n", u, 0, now)
-			gmSubmit(fmt.Sprintf("stats_timers_%s_count", u), uint32(0))
-		}
-		numStats++
+		m.Gauges = append(m.Gauges, *g)
+		delete(timers, k)
 	}
-	fmt.Fprintf(buffer, "statsd.numStats %d %d\n", numStats, now)
-	gmSubmit("statsd_numStats", uint32(numStats))
-	if clientGraphite != nil {
-		if *debug {
-			log.Println("Send to graphite: [[[%s]]]\n", string(buffer.Bytes()))
-		}
-		clientGraphite.Write(buffer.Bytes())
+
+	if m.Count() == 0 {
+		log.Info("no new measurements", *flushInterval)
+		return
 	}
+
+	payload, err := json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		return
+	}
+
+	req, err := http.NewRequest("POST", "https://metrics-api.librato.com/v1/metrics", bytes.NewBuffer(payload))
+	if err != nil {
+		return
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Set("User-Agent", "statsd/1.0")
+	req.SetBasicAuth(*libratoUser, *libratoToken)
+	resp, err := http.DefaultClient.Do(req)
+	if err == nil && resp.StatusCode != 200 {
+		if err == nil {
+			err = errors.New(fmt.Sprintf("%s", resp.Status))
+		}
+		log.Warn("error sending %d measurements: %s", m.Count(), err)
+		return
+	}
+
+	log.Debug("sending payload:\n%s", payload)
+
+	log.Info("%d measurements sent", m.Count())
+
+	for k, _ := range counters {
+		delete(counters, k)
+	}
+
+	for k, _ := range gauges {
+		delete(gauges, k)
+	}
+
+	for k, _ := range timers {
+		delete(timers, k)
+	}
+
+	return
 }
 
-func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
+func handle(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 	var packet Packet
 	var value string
 	var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
-	var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_]+):(\\-?[0-9\\.]+)\\|(c|ms)(\\|@([0-9\\.]+))?")
+	var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_\\.]+):(\\-?[0-9\\.]+)\\|(c|ms)(\\|@([0-9\\.]+))?")
 	s := sanitizeRegexp.ReplaceAllString(buf.String(), "")
+
 	for _, item := range packetRegexp.FindAllStringSubmatch(s, -1) {
 		value = item[2]
 		if item[3] == "ms" {
@@ -258,21 +217,21 @@ func handleMessage(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 		packet.Modifier = item[3]
 		packet.Sampling = float32(sampleRate)
 
-		if *debug {
-			log.Println("Packet: bucket = %s, value = %s, modifier = %s, sampling = %f\n", packet.Bucket, packet.Value, packet.Modifier, packet.Sampling)
-		}
-
 		In <- packet
 	}
 }
 
-func udpListener() {
-	address, _ := net.ResolveUDPAddr(UDP, *serviceAddress)
-	listener, err := net.ListenUDP(UDP, address)
+func listen() {
+	address, _ := net.ResolveUDPAddr("udp", *serviceAddress)
+	listener, err := net.ListenUDP("udp", address)
 	defer listener.Close()
 	if err != nil {
-		log.Fatalf("ListenAndServe: %s", err.Error())
+		log.Fatal("unable to listen: %s", err)
+		os.Exit(1)
 	}
+
+	log.Info("listening for events...")
+
 	for {
 		message := make([]byte, 512)
 		n, remaddr, error := listener.ReadFrom(message)
@@ -280,15 +239,19 @@ func udpListener() {
 			continue
 		}
 		buf := bytes.NewBuffer(message[0:n])
-		if *debug {
-			log.Println("Packet received: " + string(message[0:n]) + "\n")
-		}
-		go handleMessage(listener, remaddr, buf)
+		go handle(listener, remaddr, buf)
 	}
 }
 
 func main() {
 	flag.Parse()
-	go udpListener()
+
+	if *debug {
+		log = logger.NewLogger(logger.LOG_LEVEL_DEBUG, "statsd")
+	} else {
+		log = logger.NewLogger(logger.LOG_LEVEL_INFO, "statsd")
+	}
+
+	go listen()
 	monitor()
 }
