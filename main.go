@@ -30,7 +30,6 @@ var (
 	serviceAddress = flag.String("address", "0.0.0.0:8125", "UDP service address")
 	libratoUser    = flag.String("user", "", "Librato Username")
 	libratoToken   = flag.String("token", "", "Librato API Token")
-	libratoSource  = flag.String("source", "", "Librato Source")
 	flushInterval  = flag.Int64("flush", 30, "Flush Interval (seconds)")
 	debug          = flag.Bool("debug", false, "Enable Debugging")
 )
@@ -43,10 +42,9 @@ var (
 )
 
 type Measurement struct {
-	MeasureTime   int64         `json:"measure_time"`
-	MeasureSource string        `json:"source"`
-	Counters      []Counter     `json:"counters"`
-	Gauges        []interface{} `json:"gauges"`
+	MeasureTime int64         `json:"measure_time"`
+	Counters    []Counter     `json:"counters"`
+	Gauges      []interface{} `json:"gauges"`
 }
 
 func (m *Measurement) Count() int {
@@ -112,7 +110,6 @@ func monitor() {
 func submit() (err error) {
 	m := new(Measurement)
 	m.MeasureTime = time.Now().UTC().Unix()
-	m.MeasureSource = *libratoSource
 	m.Counters = make([]Counter, 0)
 	m.Gauges = make([]interface{}, 0)
 
