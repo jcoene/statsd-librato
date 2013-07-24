@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/jcoene/gologger"
+	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -170,7 +171,8 @@ func submit() (err error) {
 	resp, err := http.DefaultClient.Do(req)
 	if err == nil && resp.StatusCode != 200 {
 		if err == nil {
-			err = errors.New(fmt.Sprintf("%s", resp.Status))
+			raw, _ := ioutil.ReadAll(resp.Body)
+			err = errors.New(fmt.Sprintf("%s: %s", resp.Status, string(raw)))
 		}
 		log.Warn("error sending %d measurements: %s", m.Count(), err)
 		return
