@@ -30,7 +30,7 @@ var (
 	serviceAddress = flag.String("address", "0.0.0.0:8125", "UDP service address")
 	libratoUser    = flag.String("user", "", "Librato Username")
 	libratoToken   = flag.String("token", "", "Librato API Token")
-	libratoSource  = flag.String("source", "statsd", "Librato Source")
+	libratoSource  = flag.String("source", "", "Librato Source")
 	flushInterval  = flag.Int64("flush", 30, "Flush Interval (seconds)")
 	debug          = flag.Bool("debug", false, "Enable Debugging")
 )
