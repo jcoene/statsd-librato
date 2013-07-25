@@ -176,15 +176,16 @@ func submit() (err error) {
 	log.Info("%d measurements sent", m.Count())
 
 	for k, _ := range counters {
-		delete(counters, k)
+		counters[k] = 0
 	}
 
 	for k, _ := range gauges {
-		delete(gauges, k)
+		gauges[k] = 0.0
 	}
 
 	for k, _ := range timers {
-		delete(timers, k)
+		var z []float64
+		timers[k] = z
 	}
 
 	return
