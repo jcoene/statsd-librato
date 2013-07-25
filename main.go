@@ -42,11 +42,17 @@ var (
 )
 
 type Measurement struct {
-	Gauges []interface{} `json:"gauges"`
+	Counters []Counter     `json:"counters"`
+	Gauges   []interface{} `json:"gauges"`
 }
 
 func (m *Measurement) Count() int {
-	return len(m.Gauges)
+	return (len(m.Counters) + len(m.Gauges))
+}
+
+type Counter struct {
+	Name  string `json:"name"`
+	Value int64  `json:"value"`
 }
 
 type SimpleGauge struct {
@@ -102,13 +108,14 @@ func monitor() {
 
 func submit() (err error) {
 	m := new(Measurement)
+	m.Counters = make([]Counter, 0)
 	m.Gauges = make([]interface{}, 0)
 
 	for k, v := range counters {
-		g := new(SimpleGauge)
-		g.Name = k
-		g.Value = float64(v)
-		m.Gauges = append(m.Gauges, *g)
+		c := new(Counter)
+		c.Name = k
+		c.Value = v
+		m.Counters = append(m.Counters, *c)
 	}
 
 	for k, v := range gauges {
