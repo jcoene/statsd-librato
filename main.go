@@ -168,10 +168,6 @@ func submit() (err error) {
 
 	log.Info("%d measurements sent", m.Count())
 
-	for k, _ := range counters {
-		counters[k] = 0
-	}
-
 	for k, _ := range gauges {
 		gauges[k] = 0.0
 	}
