@@ -180,8 +180,7 @@ func submit() (err error) {
 	}
 
 	for k, _ := range timers {
-		var z []float64
-		timers[k] = z
+		delete(timers, k)
 	}
 
 	return
