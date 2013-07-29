@@ -93,7 +93,7 @@ func monitor() {
 					gauges[s.Bucket] = float64(0)
 				}
 				floatValue, _ := strconv.ParseFloat(s.Value, 64)
-				gauges[s.Bucket] += floatValue
+				gauges[s.Bucket] = floatValue
 			} else {
 				_, ok := counters[s.Bucket]
 				if !ok {
@@ -176,7 +176,7 @@ func submit() (err error) {
 	log.Info("%d measurements sent", m.Count())
 
 	for k, _ := range gauges {
-		gauges[k] = 0.0
+		delete(gauges, k)
 	}
 
 	for k, _ := range timers {
