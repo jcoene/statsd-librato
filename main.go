@@ -175,10 +175,6 @@ func submit() (err error) {
 
 	log.Info("%d measurements sent", m.Count())
 
-	for k, _ := range gauges {
-		delete(gauges, k)
-	}
-
 	for k, _ := range timers {
 		delete(timers, k)
 	}
