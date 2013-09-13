@@ -25,6 +25,8 @@ type Packet struct {
 }
 
 var log *logger.Logger
+var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
+var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_\\.]+):(\\-?[0-9\\.]+)\\|(c|ms|g)(\\|@([0-9\\.]+))?")
 
 var (
 	serviceAddress = flag.String("address", "0.0.0.0:8125", "UDP service address")
@@ -185,8 +187,6 @@ func submit() (err error) {
 func handle(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
 	var packet Packet
 	var value string
-	var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
-	var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_\\.]+):(\\-?[0-9\\.]+)\\|(c|ms|g)(\\|@([0-9\\.]+))?")
 	s := sanitizeRegexp.ReplaceAllString(buf.String(), "")
 
 	for _, item := range packetRegexp.FindAllStringSubmatch(s, -1) {
