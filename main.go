@@ -47,7 +47,7 @@ var (
 type Measurement struct {
 	Counters []Counter     `json:"counters"`
 	Gauges   []interface{} `json:"gauges"`
-	Source   string        `json:"source"`
+	Source   *string       `json:"source,omitempty"`
 }
 
 func (m *Measurement) Count() int {
@@ -112,7 +112,9 @@ func monitor() {
 
 func submit() (err error) {
 	m := new(Measurement)
-	m.Source = *libratoSource
+	if *libratoSource != "" {
+		m.Source = libratoSource
+	}
 	m.Counters = make([]Counter, 0)
 	m.Gauges = make([]interface{}, 0)
 
