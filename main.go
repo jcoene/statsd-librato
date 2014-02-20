@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"github.com/jcoene/gologger"
 	"io/ioutil"
+	"math"
 	"net"
 	"net/http"
 	"os"
 	"regexp"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -34,6 +36,7 @@ var (
 	libratoToken   = flag.String("token", "", "Librato API Token")
 	libratoSource  = flag.String("source", "", "Librato Source")
 	flushInterval  = flag.Int64("flush", 60, "Flush Interval (seconds)")
+	percentiles    = flag.String("percentiles", "", "List of Percentiles to Calculate with timers")
 	debug          = flag.Bool("debug", false, "Enable Debugging")
 )
 
@@ -71,6 +74,7 @@ type ComplexGauge struct {
 	Min        float64 `json:"min"`
 	Max        float64 `json:"max"`
 	SumSquares float64 `json:"sum_squares"`
+	Median     float64 `json:"median"`
 }
 
 func monitor() {
@@ -133,21 +137,20 @@ func submit() (err error) {
 	}
 
 	for k, t := range timers {
-		g := new(ComplexGauge)
-		g.Name = k
-		g.Count = len(t)
-
-		if g.Count > 0 {
-			sort.Float64s(t)
-			g.Min = t[0]
-			g.Max = t[len(t)-1]
-			for _, v := range t {
-				g.Sum += v
-				g.SumSquares += (v * v)
-			}
-		}
-
+		g := gaugePercentile(k, t, 100.0, "")
 		m.Gauges = append(m.Gauges, *g)
+
+		pcts := strings.Split(*percentiles, ",")
+		for _, pct := range pcts {
+			pctf, err := strconv.ParseFloat(pct, 64)
+			if err != nil {
+				log.Warn("error parsing %s as float: %s", pct, m.Count(), err)
+				continue
+			}
+
+			g = gaugePercentile(k, t, pctf, "pct"+pct)
+			m.Gauges = append(m.Gauges, *g)
+		}
 	}
 
 	if m.Count() == 0 {
@@ -187,6 +190,43 @@ func submit() (err error) {
 	}
 
 	return
+}
+
+func gaugePercentile(k string, t []float64, pct float64, suffix string) *ComplexGauge {
+	thresholdIdx := ((100.0 - pct) / 100.0) * float64(len(t))
+	thresholdIdx = math.Floor(thresholdIdx + 0.5)
+
+	numInPct := len(t) - int(thresholdIdx)
+	if numInPct <= 0 {
+		return nil
+	}
+
+	g := new(ComplexGauge)
+	g.Count = numInPct
+	g.Name = k
+	if suffix != "" {
+		g.Name += "." + suffix
+	}
+
+	if g.Count > 0 {
+		sort.Float64s(t)
+		g.Min = t[0]
+		g.Max = t[numInPct-1]
+		for i := 0; i < numInPct; i++ {
+			v := t[i]
+			g.Sum += v
+			g.SumSquares += (v * v)
+		}
+	}
+
+	mid := g.Count / 2
+	if g.Count%2 == 0 {
+		g.Median = t[mid]
+	} else {
+		g.Median = t[mid] + t[mid-1]
+	}
+
+	return g
 }
 
 func handle(conn *net.UDPConn, remaddr net.Addr, buf *bytes.Buffer) {
