@@ -11,7 +11,7 @@ Usage of statsd:
   -address="0.0.0.0:8125": UDP service address
   -debug=false: Enable Debugging
   -flush=30: Flush Interval (seconds)
-  -percentiles="95,99.5": Percentiles to track (comma separated)
+  -percentiles="": Percentiles to track (eg. "95,99.5")
   -token="": Librato API Token
   -user="": Librato Username
 ```
