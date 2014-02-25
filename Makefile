@@ -1,4 +1,4 @@
-VERSION=0.1.0
+VERSION=0.1.1
 
 default: fmt run
 
@@ -9,14 +9,14 @@ test:
 	go test -cover
 
 release:
-	mkdir -p bin dist
+	mkdir -p dist
 
-	GOOS=darwin GOARCH=amd64 go build -o bin/statsd
-	tar zcvf dist/statsd-${VERSION}.darwin-amd64.tar.gz bin/statsd
-	rm -f bin/statsd
+	mkdir -p statsd-${VERSION}.darwin-amd64/bin
+	GOOS=darwin GOARCH=amd64 go build -o statsd-${VERSION}.darwin-amd64/bin/statsd
+	tar zcvf dist/statsd-${VERSION}.darwin-amd64.tar.gz statsd-${VERSION}.darwin-amd64
+	rm -rf statsd-${VERSION}.darwin-amd64
 
-	GOOS=linux GOARCH=amd64 go build -o bin/statsd
-	tar zcvf dist/statsd-${VERSION}.linux-amd64.tar.gz bin/statsd
-	rm -f bin/statsd
-
-	rmdir bin
+	mkdir -p statsd-${VERSION}.linux-amd64/bin
+	GOOS=linux GOARCH=amd64 go build -o statsd-${VERSION}.linux-amd64/bin/statsd
+	tar zcvf dist/statsd-${VERSION}.linux-amd64.tar.gz statsd-${VERSION}.linux-amd64
+	rm -rf statsd-${VERSION}.linux-amd64
