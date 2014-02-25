@@ -142,7 +142,6 @@ func submit() (err error) {
 
 		if *percentiles != "" {
 			pcts := strings.Split(*percentiles, ",")
-			log.Info("pctiles: %+v", pcts)
 			for _, pct := range pcts {
 				pctf, err := strconv.ParseFloat(pct, 64)
 				if err != nil {
@@ -310,8 +309,6 @@ func main() {
 	if *libratoSource == "" {
 		getEnv(libratoSource, "LIBRATO_SOURCE")
 	}
-
-	log.Info("user: %s, token: %s, source: %s", *libratoUser, *libratoToken, *libratoSource)
 
 	go listen()
 	monitor()
