@@ -231,9 +231,13 @@ func listen() {
 	for {
 		message := make([]byte, 512)
 		n, remaddr, error := listener.ReadFrom(message)
+
 		if error != nil {
 			continue
 		}
+
+		log.Debug("received metric: %s", message)
+
 		buf := bytes.NewBuffer(message[0:n])
 		go handle(listener, remaddr, buf)
 	}
