@@ -220,13 +220,13 @@ func gaugePercentile(k string, t []float64, pct float64, suffix string) *Complex
 			g.Sum += v
 			g.SumSquares += (v * v)
 		}
-	}
 
-	mid := g.Count / 2
-	if g.Count%2 == 0 {
+		mid := g.Count / 2
 		g.Median = t[mid]
-	} else {
-		g.Median = t[mid] + t[mid-1]
+
+		if g.Count > 2 && g.Count%2 == 0 {
+			g.Median += t[mid-1]
+		}
 	}
 
 	return g
