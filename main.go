@@ -140,16 +140,19 @@ func submit() (err error) {
 		g := gaugePercentile(k, t, 100.0, "")
 		m.Gauges = append(m.Gauges, *g)
 
-		pcts := strings.Split(*percentiles, ",")
-		for _, pct := range pcts {
-			pctf, err := strconv.ParseFloat(pct, 64)
-			if err != nil {
-				log.Warn("error parsing %s as float: %s", pct, m.Count(), err)
-				continue
-			}
+		if *percentiles != "" {
+			pcts := strings.Split(*percentiles, ",")
+			log.Info("pctiles: %+v", pcts)
+			for _, pct := range pcts {
+				pctf, err := strconv.ParseFloat(pct, 64)
+				if err != nil {
+					log.Warn("error parsing '%s' as float: %s", pct, err)
+					continue
+				}
 
-			g = gaugePercentile(k, t, pctf, "pct"+pct)
-			m.Gauges = append(m.Gauges, *g)
+				g = gaugePercentile(k, t, pctf, "pct"+pct)
+				m.Gauges = append(m.Gauges, *g)
+			}
 		}
 	}
 
