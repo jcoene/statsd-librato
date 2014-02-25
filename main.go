@@ -150,7 +150,7 @@ func submit() (err error) {
 					continue
 				}
 
-				g = gaugePercentile(k, t, pctf, "pct"+pct)
+				g = gaugePercentile(k, t, pctf, pct)
 				m.Gauges = append(m.Gauges, *g)
 			}
 		}
