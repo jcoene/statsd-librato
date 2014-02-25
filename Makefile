@@ -5,6 +5,9 @@ default: fmt run
 fmt:
 	go fmt *.go
 
+build:
+	go build
+
 test:
 	go test -cover
 
