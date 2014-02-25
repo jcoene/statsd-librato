@@ -1,0 +1,12 @@
+language: go
+
+go:
+  - 1.2
+
+install:
+  - export PATH=$PATH:$HOME/gopath/bin
+  - go get code.google.com/p/go.tools/cmd/cover
+  - go get -t
+
+script:
+  - go test -cover

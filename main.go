@@ -31,13 +31,13 @@ var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
 var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_\\.]+):(\\-?[0-9\\.]+)\\|(c|ms|g)(\\|@([0-9\\.]+))?")
 
 var (
-	serviceAddress = flag.String("address", "0.0.0.0:8125", "UDP service address")
-	libratoUser    = flag.String("user", "", "Librato Username")
-	libratoToken   = flag.String("token", "", "Librato API Token")
-	libratoSource  = flag.String("source", "", "Librato Source")
-	flushInterval  = flag.Int64("flush", 60, "Flush Interval (seconds)")
-	percentiles    = flag.String("percentiles", "", "List of Percentiles to Calculate with timers")
-	debug          = flag.Bool("debug", false, "Enable Debugging")
+	serviceAddress = flag.String("address", "0.0.0.0:8125", "udp listen address")
+	libratoUser    = flag.String("user", "", "librato api username (LIBRATO_USER)")
+	libratoToken   = flag.String("token", "", "librato api token (LIBRATO_TOKEN)")
+	libratoSource  = flag.String("source", "", "librato api source (LIBRATO_SOURCE)")
+	flushInterval  = flag.Int64("flush", 60, "interval at which data is sent to librato (in seconds)")
+	percentiles    = flag.String("percentiles", "", "comma separated list of percentiles to calculate for timers (eg. \"95,99.5\")")
+	debug          = flag.Bool("debug", false, "enable logging of inputs and submissions")
 )
 
 var (
@@ -292,6 +292,33 @@ func main() {
 		log = logger.NewLogger(logger.LOG_LEVEL_INFO, "statsd")
 	}
 
+	if *libratoUser == "" {
+		if !getEnv(libratoUser, "LIBRATO_USER") {
+			log.Fatal("specify a librato user with -user or the LIBRATO_USER environment variable")
+		}
+	}
+
+	if *libratoToken == "" {
+		if !getEnv(libratoToken, "LIBRATO_TOKEN") {
+			log.Fatal("specify a librato token with -token or the LIBRATO_TOKEN environment variable")
+		}
+	}
+
+	if *libratoSource == "" {
+		getEnv(libratoSource, "LIBRATO_SOURCE")
+	}
+
+	log.Info("user: %s, token: %s, source: %s", *libratoUser, *libratoToken, *libratoSource)
+
 	go listen()
 	monitor()
+}
+
+func getEnv(p *string, key string) bool {
+	if s := os.Getenv(key); s != "" {
+		*p = s
+		return true
+	}
+
+	return false
 }
