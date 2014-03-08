@@ -19,6 +19,8 @@ import (
 	"time"
 )
 
+const VERSION = "0.1.3"
+
 type Packet struct {
 	Bucket   string
 	Value    string
@@ -38,6 +40,7 @@ var (
 	flushInterval  = flag.Int64("flush", 60, "interval at which data is sent to librato (in seconds)")
 	percentiles    = flag.String("percentiles", "", "comma separated list of percentiles to calculate for timers (eg. \"95,99.5\")")
 	debug          = flag.Bool("debug", false, "enable logging of inputs and submissions")
+	version        = flag.Bool("version", false, "print version and exit")
 )
 
 var (
@@ -299,6 +302,11 @@ func listen() {
 
 func main() {
 	flag.Parse()
+
+	if *version {
+		fmt.Printf("statsd-librato v%s\n", VERSION)
+		return
+	}
 
 	if *debug {
 		log = logger.NewLogger(logger.LOG_LEVEL_DEBUG, "statsd")
