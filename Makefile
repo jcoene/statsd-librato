@@ -5,6 +5,9 @@ default: fmt run
 fmt:
 	go fmt *.go
 
+debug:
+	go run main.go -debug -flush=5 -percentiles=90,95,99
+
 build:
 	go build
 
