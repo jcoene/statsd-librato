@@ -27,8 +27,8 @@ type Packet struct {
 }
 
 var log *logger.Logger
-var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.:\\|@]")
-var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_\\.]+):(\\-?[0-9\\.]+)\\|(c|ms|g)(\\|@([0-9\\.]+))?")
+var sanitizeRegexp = regexp.MustCompile("[^a-zA-Z0-9\\-_\\.,:\\|@]")
+var packetRegexp = regexp.MustCompile("([a-zA-Z0-9_\\.,]+):(\\-?[0-9\\.]+)\\|(c|ms|g)(\\|@([0-9\\.]+))?")
 
 var (
 	serviceAddress = flag.String("address", "0.0.0.0:8125", "udp listen address")
@@ -58,17 +58,20 @@ func (m *Measurement) Count() int {
 }
 
 type Counter struct {
-	Name  string `json:"name"`
-	Value int64  `json:"value"`
+	Name   string  `json:"name"`
+	Source *string `json:"source,omitempty"`
+	Value  int64   `json:"value"`
 }
 
 type SimpleGauge struct {
-	Name  string  `json:"name"`
-	Value float64 `json:"value"`
+	Name   string  `json:"name"`
+	Source *string `json:"source,omitempty"`
+	Value  float64 `json:"value"`
 }
 
 type ComplexGauge struct {
 	Name       string  `json:"name"`
+	Source     *string `json:"source,omitempty"`
 	Count      int     `json:"count"`
 	Sum        float64 `json:"sum"`
 	Min        float64 `json:"min"`
@@ -114,6 +117,15 @@ func monitor() {
 	}
 }
 
+func parseBucket(bucket string) (string, *string) {
+	if strings.Contains(bucket, ",") {
+		ss := strings.SplitN(bucket, ",", 2)
+		return ss[1], &ss[0]
+	}
+
+	return bucket, nil
+}
+
 func submit() (err error) {
 	m := new(Measurement)
 	if *libratoSource != "" {
@@ -124,14 +136,14 @@ func submit() (err error) {
 
 	for k, v := range counters {
 		c := new(Counter)
-		c.Name = k
+		c.Name, c.Source = parseBucket(k)
 		c.Value = v
 		m.Counters = append(m.Counters, *c)
 	}
 
 	for k, v := range gauges {
 		g := new(SimpleGauge)
-		g.Name = k
+		g.Name, g.Source = parseBucket(k)
 		g.Value = v
 		m.Gauges = append(m.Gauges, *g)
 	}
@@ -204,11 +216,11 @@ func gaugePercentile(k string, t []float64, pct float64, suffix string) *Complex
 	}
 
 	g := new(ComplexGauge)
-	g.Count = numInPct
-	g.Name = k
+	g.Name, g.Source = parseBucket(k)
 	if suffix != "" {
 		g.Name += "." + suffix
 	}
+	g.Count = numInPct
 
 	if g.Count > 0 {
 		sort.Float64s(t)
