@@ -19,7 +19,7 @@ import (
 	"time"
 )
 
-const VERSION = "0.1.3"
+const VERSION = "0.1.4"
 
 type Packet struct {
 	Bucket   string
@@ -164,8 +164,9 @@ func submit() (err error) {
 					continue
 				}
 
-				g = gaugePercentile(k, t, pctf, pct)
-				m.Gauges = append(m.Gauges, *g)
+				if g = gaugePercentile(k, t, pctf, pct); g != nil {
+					m.Gauges = append(m.Gauges, *g)
+				}
 			}
 		}
 	}
