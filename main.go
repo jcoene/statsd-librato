@@ -184,6 +184,9 @@ func submit() (err error) {
 	log.Debug("sending payload:\n%s", payload)
 
 	req, err := http.NewRequest("POST", "https://metrics-api.librato.com/v1/metrics", bytes.NewBuffer(payload))
+
+	req.Close = true
+
 	if err != nil {
 		return
 	}
