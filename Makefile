@@ -1,15 +1,26 @@
-VERSION=0.1.4
+name := statsd
+version := $(shell cat main.go | grep VERSION | sed -e 's/\"//g' | head -n1 |cut -d' ' -f4)
 
-default: fmt run
+default: fmt build
 
 fmt:
 	go fmt *.go
 
-debug:
-	go run main.go -debug -flush=5 -percentiles=90,95,99
-
 build:
-	go build
+	go build -o $(name)
+
+build-linux-amd64:
+	GOOS=linux GOARCH=amd64 go build -o $(name)_linux_amd64
+
+docker-build:
+	GOOS=linux GOARCH=amd64 go build -o $(name)_linux_amd64
+	docker build -t jcoene/statsd-librato:latest .
+
+docker-release: docker-build
+	docker push jcoene/statsd-librato:latest
+
+run: build
+	./statsd -debug -flush=5 -percentiles=90,95,99
 
 test:
 	go test -cover
@@ -17,12 +28,12 @@ test:
 release:
 	mkdir -p dist
 
-	mkdir -p statsd-${VERSION}.darwin-amd64/bin
-	GOOS=darwin GOARCH=amd64 go build -o statsd-${VERSION}.darwin-amd64/bin/statsd
-	tar zcvf dist/statsd-${VERSION}.darwin-amd64.tar.gz statsd-${VERSION}.darwin-amd64
-	rm -rf statsd-${VERSION}.darwin-amd64
+	mkdir -p statsd-$(version).darwin-amd64/bin
+	GOOS=darwin GOARCH=amd64 go build -o statsd-$(version).darwin-amd64/bin/statsd
+	tar zcvf dist/statsd-$(version).darwin-amd64.tar.gz statsd-$(version).darwin-amd64
+	rm -rf statsd-$(version).darwin-amd64
 
-	mkdir -p statsd-${VERSION}.linux-amd64/bin
-	GOOS=linux GOARCH=amd64 go build -o statsd-${VERSION}.linux-amd64/bin/statsd
-	tar zcvf dist/statsd-${VERSION}.linux-amd64.tar.gz statsd-${VERSION}.linux-amd64
-	rm -rf statsd-${VERSION}.linux-amd64
+	mkdir -p statsd-$(version).linux-amd64/bin
+	GOOS=linux GOARCH=amd64 go build -o statsd-$(version).linux-amd64/bin/statsd
+	tar zcvf dist/statsd-$(version).linux-amd64.tar.gz statsd-$(version).linux-amd64
+	rm -rf statsd-$(version).linux-amd64

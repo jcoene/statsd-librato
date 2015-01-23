@@ -1,1 +1,3 @@
 dist
+statsd
+statsd_linux_amd64
