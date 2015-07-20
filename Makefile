@@ -9,11 +9,7 @@ fmt:
 build:
 	go build -o $(name)
 
-build-linux-amd64:
-	GOOS=linux GOARCH=amd64 go build -o $(name)_linux_amd64
-
 docker-build:
-	GOOS=linux GOARCH=amd64 go build -o $(name)_linux_amd64
 	docker build -t jcoene/statsd-librato:latest .
 
 docker-release: docker-build
